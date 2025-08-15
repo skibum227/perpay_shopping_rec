@@ -32,7 +32,7 @@ services:
     environment:
       - OLLAMA_BASE=http://ollama:11434/v1
       - OLLAMA_KEY=ollama
-      - OLLAMA_MODEL=${OLLAMA_MODEL}
+      - OLLAMA_MODEL=qwen3:0.6b
       - BACKEND_URL=http://backend:8000
     ports:
       - "8501:8501"
