@@ -202,6 +202,29 @@ def extract_object(user_text: str) -> str:
         toks = re.findall(r"[a-zA-Z0-9\-]{3,}", user_text.lower())
         return _canon_object(toks[0]) if toks else ""
 
+# def extract_object(user_text: str) -> str:
+#     """
+#     Extract a specific retail product type (1–2 words). Avoid generic words.
+#     """
+#     prompt = (
+#         "Extract the specific retail product type from the user's request.\n"
+#         "Output ONLY 1–2 words (e.g., 'hair dryer', 'dash cam', 'running shoes').\n"
+#         "Avoid generic words like 'device', 'product', 'electronics', 'tool'.\n"
+#         f"User: \"{user_text}\""
+#     )
+#     try:
+#         resp = client.chat.completions.create(
+#             model=MODEL,
+#             messages=[{"role": "system", "content": prompt}],
+#             temperature=0.0,
+#         )
+#         obj = _strip_think(resp.choices[0].message.content).strip()
+#         obj = re.sub(r"[\n\r]+", " ", obj).strip()
+#         return _canon_object(obj)
+#     except Exception:
+#         toks = re.findall(r"[a-zA-Z0-9\-]{3,}(?: [a-zA-Z0-9\-]{3,})?", user_text.lower())
+#         return _canon_object(toks[0]) if toks else ""
+
 def extract_three_terms(obj: str) -> List[str]:
     """
     Use the exact prompt to get exactly three terms describing the object.
@@ -220,6 +243,58 @@ def extract_three_terms(obj: str) -> List[str]:
         cleaned = [_canon_object(p) for p in parts if p.strip()]
     except Exception:
         cleaned = []
+
+    # ensure exactly three items (dedupe, trim/pad)
+    uniq = []
+    for t in cleaned:
+        if t and t not in uniq:
+            uniq.append(t)
+    uniq = uniq[:3]
+    while len(uniq) < 3:
+        uniq.append(obj if obj and obj not in uniq else "")
+    return [t for t in uniq if t]
+
+# def extract_three_terms(user_text: str, obj: str = "") -> List[str]:
+#     """
+#     Use the full user prompt + object to produce EXACTLY three concrete descriptors.
+#     Avoid generic words like device/product/tool/electronics/phone/computer.
+#     """
+#     prompt = (
+#         "Given the user's request and the object, output EXACTLY three short descriptors "
+#         "(single words or short phrases) that help retrieve the right item. "
+#         "Prefer features (e.g., 'ionic', '1875w'), use-case ('travel'), form factor ('cordless'), "
+#         "material/color family. Avoid generic words like 'device', 'product', 'tool', "
+#         "'electronics', 'phone', 'computer' unless explicitly present.\n\n"
+#         f"User: \"{user_text}\"\nObject: \"{obj}\""
+#     )
+#     cleaned: List[str] = []
+#     try:
+#         resp = client.chat.completions.create(
+#             model=MODEL,
+#             messages=[{"role": "system", "content": prompt}],
+#             temperature=0.0,
+#         )
+#         raw = _strip_think(resp.choices[0].message.content).strip()
+#         parts = re.split(r"[,\n]+", raw)
+#         cleaned = [_canon_object(p) for p in parts if p.strip()]
+#     except Exception:
+#         cleaned = []
+
+    # ensure exactly three, de-dup, strip generics, fallback from user text
+    banned = {"device", "product", "tool", "electronics", "phone", "computer"}
+    uniq: List[str] = []
+    for t in cleaned:
+        if t and t not in uniq and t not in banned:
+            uniq.append(t)
+    uniq = uniq[:3]
+    while len(uniq) < 3:
+        for m in re.findall(r"[a-z0-9]{3,}", _norm(user_text)):
+            if m not in banned and m != obj and m not in uniq:
+                uniq.append(m)
+                break
+        if len(uniq) < 3:
+            uniq.append(obj if obj and obj not in uniq else "")
+    return [t for t in uniq[:3] if t]
 
     # ensure exactly three items (dedupe, trim/pad)
     uniq = []
